@@ -1,5 +1,5 @@
 # depslib dependency file v1.0
-1705589784 source:c:\users\sinira viana\documents\buckshot\main.c
+1705629193 source:c:\users\sinira viana\documents\buckshot\main.c
 	<stdio.h>
 	<stdlib.h>
 	<windows.h>
