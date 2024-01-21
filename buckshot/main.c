@@ -5,16 +5,14 @@
 
 /*
 MUDANÇAS ATUAIS:
-- Melhoria no código da função jogada
-- Adicionados os seguintes itens:
-    - Lata
-    - Lupa
-    - Cigarro
-    - Algemas
-    - Faca
+- Sistema para garantir que não virão todas as balas iguais
+- Adicionado estatisticas ao final da partida
+- Adicionado o recebimentos de itens aleatórios a cada recarga
+- Limite máximo de 8 itens para cada player
 */
 
 struct player {
+    int num;
     int life;
     int cor;
     int qtdItem;
@@ -36,13 +34,13 @@ struct arma {
     struct bala *random;
     int qtd;
     int prox;
+    int recarga;
+    int rodadas;
 };
-
-
 
 struct bala* criaBalas(int);
 struct arma carregarArma();
-struct player* criarPlayer();
+struct player* criarPlayer(int);
 
 void color(int);
 void continuar();
@@ -52,47 +50,37 @@ void printBalas(struct arma*);
 void printHud(struct player *,struct player *,struct arma*);
 void receberItens(struct player*);
 void exibirItens(struct player *);
+void novaRodada(struct player*, struct player*,struct arma*);
 int usarItens(struct player *,struct arma *);
 
 void main() {
     struct player *p1, *p2;
-    p1 = criarPlayer();
-    p2 = criarPlayer();
+    p1 = criarPlayer(1);
+    p2 = criarPlayer(2);
     p1->cor = 9; //Azul
     p2->cor = 12; //Vermelho
 
     struct arma shotgun;
     shotgun = carregarArma();
 
-    receberItens(p1);
-    receberItens(p2);
-    //receberItens(p2);
-
-    int *rodada = 0;
-    //int *recargas = 1;
+    novaRodada(p1, p2, &shotgun);
+    int *rodada=0;
     while(p1->life > 0 && p2->life > 0) {
-            /*
-        for(int i=0; i<shotgun.qtd; i++) {
-            printf("[%d]", shotgun.random[i].carregada);
-        }
-        printBalas(&shotgun);
-        printf("[P1: %d]-x-[P2: %d]\n", p1->life, p2->life);
-            */
-        //printf("Recargas: %d\n", recargas);
-
         jogada(&rodada, p1, p2, &shotgun);
-        if((shotgun.prox) == (shotgun.qtd)) {
-            shotgun = carregarArma();
-            //recargas++;
-        }
+        if((shotgun.prox) == (shotgun.qtd)) novaRodada(p1, p2, &shotgun);
     }
+
     if(p1->life > p2->life) {
         color(10);
-        printf("O PLAYER 1 VENCEU");
+        printf("O PLAYER 1 VENCEU\n");
     } else {
         color(10);
-        printf("O PLAYER 2 VENCEU");
+        printf("O PLAYER 2 VENCEU\n");
     }
+
+    printf("ESTATISTICAS: \n");
+    printf("[RECARGAS: %d]\n", shotgun.recarga);
+    printf("[RODADAS: %d]\n", shotgun.rodadas);
     color(15);
 }
 
@@ -103,12 +91,19 @@ struct bala *criaBalas(int qtd) {
     balas = (struct bala*)malloc((qtd) * sizeof(struct bala));
 
     struct bala bala;
-    for(int i=0; i<(qtd); i++) {
-        bala.carregada = rand()%2;
-        if(bala.carregada) bala.cor = 12;
-        else bala.cor = 8;
-        balas[i] = bala;
-    }
+
+    int i,flag;
+    do {
+        flag=0;
+        for(i=0; i<(qtd); i++) {
+            bala.carregada = rand()%2;
+            if(bala.carregada) bala.cor = 12;
+            else bala.cor = 8;
+            balas[i] = bala;
+            if(balas[0].carregada == balas[i].carregada) flag++;
+        }
+    }while(flag==qtd);//Testa se todas as balas são iguais
+
     return balas;
 }
 
@@ -128,6 +123,8 @@ struct arma carregarArma() {
     arma.random = random;
     arma.qtd = qtd;
     arma.prox = 0;
+    arma.recarga = 1;
+    arma.rodadas = 0;
 
     for(i=0; i<qtd; i++) {
         arma.random[i] = arma.balas[i];
@@ -144,9 +141,10 @@ struct arma carregarArma() {
     return arma;
 }
 
-struct player* criarPlayer(){
+struct player* criarPlayer(int num){
     struct player *p;
     p = (struct player*)malloc(sizeof(struct player));
+    p->num = num;
     p->life = 5;
     p->lupas = 0;
     p->cigarros = 0;
@@ -175,9 +173,11 @@ void printVida(struct player* p1, struct player* p2) {
 }
 
 void printHud(struct player *p1, struct player *p2, struct arma* arma) {
+    // ATIVA O DEBBUG QUE MOSTRA AS BALAS NA ORDEM CORRETA
     /*for(int i=0; i<arma->qtd; i++) {
         printf("[%d]", arma->random[i].carregada);
     }*/
+
     printBalas(arma);
     printf("[P1: %d]-x-[P2: %d]\n", p1->life, p2->life);
 }
@@ -242,19 +242,41 @@ void jogada(int *rodada, struct player *p1, struct player *p2, struct arma* arma
         arma->prox++;
     }
 
+    arma->rodadas++;
     system("cls");
     color(15);
 }
 
 void receberItens(struct player *player) {
-    if(player->qtdItem < 8) {
-        player->cigarros+=2;
-        player->lupas+= 2;
-        player->latas+=2;
-        player->algemas+=2;
-        player->facas+=2;
-        player->qtdItem+= 10;
+    int choice, i, qtd0=0, qtd1=0, qtd2=0, qtd3=0, qtd4=0;
+
+    for(i=0;i<4;i++) {
+        choice = rand()%5;
+
+        if(player->qtdItem < 8) {
+
+            switch (choice) {
+                case 0: player->latas++; qtd0++; break;
+                case 1: player->algemas++; qtd1++; break;
+                case 2: player->lupas++; qtd2++; break;
+                case 3: player->cigarros++; qtd3++; break;
+                case 4: player->facas++; qtd4++; break;
+            }
+            player->qtdItem++;
+
+        }else break;
     }
+    color(player->cor);
+    if(qtd0||qtd1||qtd2||qtd3||qtd4) {
+        printf("O Player %d recebeu:\n", player->num);
+        if(qtd0>0)printf("[Latas: +%d]\n", qtd0);
+        if(qtd1>0)printf("[Algemas: +%d]\n", qtd1);
+        if(qtd2>0)printf("[Lupas: +%d]\n", qtd2);
+        if(qtd3>0)printf("[Cigarros: +%d]\n", qtd3);
+        if(qtd4>0)printf("[Facas: +%d]\n", qtd4);
+    }else printf("O Player %d esta com o inventário cheio.\n", player->num);
+    color(15);
+
 }
 
 void exibirItens(struct player *player) {
@@ -377,4 +399,19 @@ void continuar() {
     printf("Pressione ENTER para continuar:");
     fflush(stdin);
     getchar();
+}
+
+void novaRodada(struct player* p1, struct player* p2, struct arma* shotgun) {
+    *shotgun = carregarArma();
+    shotgun->recarga++;
+
+    color(10);
+    printf("[RECARGA: %d]\n", shotgun->recarga);
+    color(15);
+    printf("Novas balas: ");
+    printHud(p1, p2, shotgun);
+    receberItens(p1);
+    receberItens(p2);
+    continuar();
+    system("cls");
 }
